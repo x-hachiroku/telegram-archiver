@@ -1,0 +1,21 @@
+{
+  "log": {
+    "level": "INFO",
+    "dir": null
+  },
+  "db": {
+    "url": "postgresql+psycopg2://tgsync:tgsync@postgres:5432/tgsync"
+  },
+  "tg": {
+    "api_id": -1,
+    "api_hash": "",
+    "session": "/appdata/tgsync-default.session",
+    "message_limit": 2000,
+    "chats": {
+      "-10023333333": {},
+      "-10066666666": {
+        "range": [500, 0]
+      }
+    }
+  }
+}

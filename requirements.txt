@@ -1,0 +1,4 @@
+loguru>=0.7.0
+sqlalchemy>=1.4.0
+psycopg2-binary
+Telethon>=1.0.0

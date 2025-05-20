@@ -1,0 +1,30 @@
+networks:
+  tgsync:
+    driver: 'bridge'
+
+services:
+  postgres:
+    image: 'postgres'
+    container_name: 'postgres'
+    restart: 'unless-stopped'
+
+    networks: ['tgsync']
+    volumes:
+      - './postgres/data:/var/lib/postgresql/data'
+    environment:
+      POSTGRES_USER: 'tgsync'
+      POSTGRES_PASSWORD: 'tgsync'
+      POSTGRES_DB: 'tgsync'
+
+  tgsync:
+    image: 'tgsync:dev'
+    build: '.'
+    container_name: 'tgsync'
+    restart: 'unless-stopped'
+
+    depends_on: ['postgres']
+    networks: ['tgsync']
+    volumes:
+      - './appdata:/appdata'
+      - './media:/media'
+      - './tmp:/tmp'

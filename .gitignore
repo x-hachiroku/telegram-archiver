@@ -1,0 +1,6 @@
+media/
+temp/
+postgres/
+
+appdata/*
+!appdata/config.example.json
