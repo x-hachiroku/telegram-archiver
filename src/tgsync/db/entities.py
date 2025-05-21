@@ -43,3 +43,12 @@ class MessageEntity(Base):
     photo_id    = Column(BigInteger, ForeignKey('photo.id'))
     document_id = Column(BigInteger, ForeignKey('document.id'))
     linked      = Column(Boolean, default=False)
+
+
+class FileCodeEntity(Base):
+    __tablename__ = 'file_code'
+
+    code         = Column(String(255), primary_key=True)
+    bot_username = Column(String(255))
+    start_id = Column(BigInteger)
+    end_id   = Column(BigInteger)
