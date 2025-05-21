@@ -32,6 +32,7 @@ def msg_to_dicts(msg, msg_dicts, photo_dicts, document_dicts):
         'fwd_from_date'      : None,
         'photo_id'    : None,
         'document_id' : None,
+        'linked'      : False,
     }
 
     if msg.is_reply:

@@ -42,3 +42,4 @@ class MessageEntity(Base):
 
     photo_id    = Column(BigInteger, ForeignKey('photo.id'))
     document_id = Column(BigInteger, ForeignKey('document.id'))
+    linked      = Column(Boolean, default=False)
