@@ -4,6 +4,7 @@ import traceback
 from time import time
 from pathlib import Path
 from mimetypes import guess_extension
+from tabulate import tabulate
 
 from sqlalchemy import select
 
@@ -45,24 +46,31 @@ class ProgressSummary:
 
         if time() - self.report_time < config['tg']['progress_summary_interval']:
             return
+        self.report_time = time()
 
-        logger.info('---')
+        task_table = []
         total_speed = 0
         for task in self.tasks:
             if task['name'] is None:
                 continue
+
             total_speed += task['speed']
-            logger.info(f'# {task["seq"]}: '
-                        f'{task["name"]}'
-                         ' | '
-                        f'{format_bytes(task["received"])}'
-                         '/'
-                        f'{format_bytes(task["total"])}'
-                         '|'
-                        f'{format_bytes(task["speed"])}/s')
-        logger.info(f'Total speed: {format_bytes(total_speed)}/s')
-        logger.info('---')
-        self.report_time = time()
+
+            name = task['name']
+            if len(name) > 64:
+                name = name[:50] + '...' + name[-10:]
+
+            task_table.append([
+                f'#{task["seq"]}',
+                name,
+                f'{format_bytes(task["received"])}/{format_bytes(task["total"])}',
+                f'{100*task["received"] / task["total"]:.1f}%',
+                f'{format_bytes(task["speed"])}/s',
+            ])
+
+        task_table.append(['', 'Total:', '', '', f'{format_bytes(total_speed)}/s'])
+
+        logger.info('\n'+tabulate(task_table))
 
 
 async def save_worker(seq, queue, progress_summary, client):
