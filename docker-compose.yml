@@ -27,4 +27,4 @@ services:
     volumes:
       - './appdata:/appdata'
       - './media:/media'
-      - './tmp:/tmp'
+      - './incomplete:/incomplete'

@@ -1,7 +1,6 @@
 import json
-from pathlib import Path
 
-from tgsync.config import config
+from tgsync.config import appdata
 from tgsync.logger import logger
 
 
@@ -10,10 +9,10 @@ async def list_chats(client):
     async for dialog in client.iter_dialogs():
         chats[dialog.name] = str(dialog.id)
 
-    with open(Path('/appdata') / 'chats.json', 'w') as f:
+    with open(appdata / 'chats.json', 'w') as f:
         json.dump(chats, f, ensure_ascii=False, indent=2)
 
-    logger.info(f'Chats saved to {Path("/appdata") / "chats.json"}.')
+    logger.info(f'Chats saved to {appdata / "chats.json"}.')
 
     return chats
 

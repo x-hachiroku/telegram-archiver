@@ -1,8 +1,8 @@
 import re
 import os
-from pathlib import Path
 from mimetypes import guess_extension
 
+from tgsync.config import config
 from tgsync.logger import logger
 from tgsync.db.session import session_generator
 from tgsync.db.entities import MessageEntity, PhotoEntity, DocumentEntity
@@ -44,15 +44,15 @@ def link_media():
         ).all()
 
         for msg, photo_id in candidates:
-            chat_dir = Path('/media') / str(msg.chat_id)
+            chat_dir = config['download']['media'] / str(msg.chat_id)
             chat_dir.mkdir(parents=True, exist_ok=True)
 
             dst = chat_dir / f'{msg.id}_{photo_id}.jpg'
 
             logger.debug(f'Linking {photo_id} to {dst}')
-            if os.path.exists(Path('/media/photos-by-id') / f'{photo_id}.jpg'):
+            if os.path.exists(config['download']['media'] / 'photos-by-id' / f'{photo_id}.jpg'):
                 if not os.path.exists(dst):
-                    os.link(Path('/media/photos-by-id') / f'{photo_id}.jpg', dst)
+                    os.link(config['download']['media'] / 'photos-by-id' / f'{photo_id}.jpg', dst)
                 else:
                     logger.warning(f'File {dst} already exists, skipping...')
             else:
@@ -76,13 +76,13 @@ def link_media():
         ).all()
 
         for msg, document_id, document_name, document_type in candidates:
-            chat_dir = Path('/media') / str(msg.chat_id)
+            chat_dir = config['download']['media'] / str(msg.chat_id)
             chat_dir.mkdir(parents=True, exist_ok=True)
 
             ext = guess_extension(document_type)
             if ext is None:
                 ext = '.bin'
-            src = Path('/media/documents-by-id') / f'{document_id}{ext}'
+            src = config['download']['media'] / 'documents-by-id' / f'{document_id}{ext}'
 
             filename = f'{msg.id}'
             if document_name:

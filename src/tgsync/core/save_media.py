@@ -2,7 +2,6 @@ import shutil
 import asyncio
 import traceback
 from time import time
-from pathlib import Path
 from mimetypes import guess_extension
 from tabulate import tabulate
 
@@ -25,7 +24,7 @@ class ProgressSummary:
             'speed': 0,
             'received': 0,
             'last_report': 0,
-        } for i in range(config['tg']['concurrent_downloads'])]
+        } for i in range(config['download']['concurrent'])]
 
     def make_progress_callback(self, seq):
         def progress_callback(received, total):
@@ -44,7 +43,7 @@ class ProgressSummary:
                     return f'{b:.2f}{unit}'
                 b /= 1024
 
-        if time() - self.report_time < config['tg']['progress_summary_interval']:
+        if time() - self.report_time < config['download']['summary_interval']:
             return
         self.report_time = time()
 
@@ -85,17 +84,17 @@ async def save_worker(seq, queue, progress_summary, client):
             if msg.photo:
                 entity_type = PhotoEntity
                 entity_id = msg.photo.id
-                tempfile = Path('/temp/photos-by-id') / f'{msg.photo.id}.jpg'
-                file = Path('/media/photos-by-id') / f'{msg.photo.id}.jpg'
-                progress_summary.tasks[seq]['name'] = f'{msg.chat_id}/{msg.id}.jpg'
+                tempfile = config['download']['incomplete'] / 'photos-by-id' / f'{msg.photo.id}.jpg'
+                file = config['download']['media'] / 'photos-by-id' / f'{msg.photo.id}.jpg'
+                progress_summary.tasks[seq]['name'] = f"{msg.chat_id}/{msg.id}.jpg"
             elif msg.document:
                 entity_type = DocumentEntity
                 entity_id = msg.document.id
                 ext = guess_extension(msg.document.mime_type)
                 if ext is None:
                     ext = '.bin'
-                tempfile = Path('/temp/documents-by-id') / f'{msg.document.id}{ext}'
-                file = Path('/media/documents-by-id') / f'{msg.document.id}{ext}'
+                tempfile = config['download']['incomplete'] / 'documents-by-id' / f'{msg.document.id}{ext}'
+                file = config['download']['media'] / 'documents-by-id' / f'{msg.document.id}{ext}'
                 progress_summary.tasks[seq]['name'] = f'{msg.chat_id}/{msg.document.id}{ext}'
                 if msg.file.name:
                     progress_summary.tasks[seq]['name'] = f'{msg.chat_id}/{msg.file.name}'
@@ -124,16 +123,16 @@ async def save_worker(seq, queue, progress_summary, client):
 
 
 async def save_all(client, chat_id, photo):
-    Path('/temp/photos-by-id').mkdir(parents=True, exist_ok=True)
-    Path('/temp/documents-by-id').mkdir(parents=True, exist_ok=True)
-    Path('/media/photos-by-id').mkdir(parents=True, exist_ok=True)
-    Path('/media/documents-by-id').mkdir(parents=True, exist_ok=True)
+    (config['download']['incomplete'] / 'photos-by-id').mkdir(parents=True, exist_ok=True)
+    (config['download']['incomplete'] / 'documents-by-id').mkdir(parents=True, exist_ok=True)
+    (config['download']['media'] / 'photos-by-id').mkdir(parents=True, exist_ok=True)
+    (config['download']['media'] / 'documents-by-id').mkdir(parents=True, exist_ok=True)
 
     queue = asyncio.Queue(maxsize=config['tg']['message_limit'] // 2)
     progress_summary = ProgressSummary()
 
     workers = [asyncio.create_task(save_worker(i, queue, progress_summary, client))
-               for i in range(config['tg']['concurrent_downloads'])]
+               for i in range(config['download']['concurrent'])]
 
     if photo:
         stmt = (

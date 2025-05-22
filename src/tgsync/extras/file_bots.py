@@ -143,12 +143,13 @@ class ShowFilesBotHandler(FileBotHandler):
 
 
 async def main():
+    from tgsync.config import appdata
     from tgsync.core.get_client import get_client
 
     client = await get_client()
     bot = ShowFilesBotHandler(client)
 
-    with open('/appdata/code.txt', 'r') as f:
+    with open(appdata / 'code.txt', 'r') as f:
         line = f.read().splitlines()
     for l in line:
         bot.search_code(l)

@@ -2,9 +2,7 @@ import os
 import asyncio
 import argparse
 
-from pathlib import Path
-
-from tgsync.config import config
+from tgsync.config import appdata, config
 from tgsync.logger import logger
 from tgsync.core.get_client import get_client
 from tgsync.core.list_chats import list_chats
@@ -45,7 +43,7 @@ async def main():
     parser.add_argument('-s', '--setup', action='store_true', help='Run setup')
     args = parser.parse_args()
 
-    setup = not os.path.exists(Path('/appdata') / config['tg']['session']) or args.setup
+    setup = not os.path.exists(appdata / config['tg']['session']) or args.setup
     if setup:
         logger.warning('No session file found. Please run the container in interactive mode to login.')
 

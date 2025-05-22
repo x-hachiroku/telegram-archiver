@@ -5,10 +5,8 @@ Synchronize Telegram messages and media to local storage.
 
 ## Quick Start
 
-1. Clone this repo, configure `docker-compose.yaml`. The following volumes are used by `tgsync`:
+1. Clone this repo, configure `docker-compose.yaml`.
     * `/appdata`: Configuration files, session data, and logs
-    * `/media`: Downloaded media files
-    * `/temp`: Temporary directory for incomplete downloads (MTProto downloads typically cause minimal fragmentation)
 
 2. Start the container in interactive mode to login:
    ```sh
@@ -25,7 +23,7 @@ Synchronize Telegram messages and media to local storage.
    {
      "log": {
        "level": "INFO",
-       "dir": null
+       "dir": null // Directory to store logs, null to disable logging to file
      },
      "db": {
        "url": "postgresql+psycopg2://tgsync:tgsync@postgres:5432/tgsync"
@@ -35,14 +33,18 @@ Synchronize Telegram messages and media to local storage.
        "api_hash": "", // https://core.telegram.org/api/obtaining_api_id
        "session": "/appdata/tgsync-default.session",
        "message_limit": 2000, // Number of messages to fetch in one request
-       "concurrent_downloads": 4, // Maximum number of concurrent media downloads
-       "progress_summary_interval": 30, // Interval in seconds to log progress summary
         "chats": {
           "-10023333333": {}, // Key: Chat ID to sync, available at `/appdata/chats.json` after first login
           "-10066666666": {
             "range": [500, 0] // Sync range, 0 means no limit on that side, leave empty to sync all messages
           }
         }
+     },
+     "download": {
+       "media": "/media", // Downloaded media files
+       "incomplete": "/incomplete", //Temporary directory for incomplete downloads
+       "concurrent": 4, // Maximum number of concurrent media downloads
+       "summary_interval": 30 // Interval in seconds to log progress summary
      }
    }
    ```

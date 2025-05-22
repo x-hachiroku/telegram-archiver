@@ -1,12 +1,12 @@
 from telethon import TelegramClient
 
-from tgsync.config import config
+from tgsync.config import appdata, config
 from tgsync.logger import logger
 
 
 async def get_client():
     client = TelegramClient(
-        config['tg']['session'],
+        appdata / config['tg']['session'],
         config['tg']['api_id'],
         config['tg']['api_hash'],
     )

@@ -11,13 +11,17 @@
     "api_hash": "",
     "session": "/appdata/tgsync-default.session",
     "message_limit": 2000,
-    "concurrent_downloads": 4,
-    "progress_summary_interval": 30,
-    "chats": {
-      "-10023333333": {},
-      "-10066666666": {
-        "range": [500, 0]
-      }
-    }
+     "chats": {
+       "-10023333333": {},
+       "-10066666666": {
+         "range": [500, 0]
+       }
+     }
+  },
+  "download": {
+    "media": "/media",
+    "incomplete": "/incomplete",
+    "concurrent": 4,
+    "summary_interval": 30
   }
 }
