@@ -44,6 +44,7 @@ Synchronize Telegram messages and media to local storage.
        "media": "/media", // Downloaded media files
        "incomplete": "/incomplete", //Temporary directory for incomplete downloads
        "concurrent": 4, // Maximum number of concurrent media downloads
+       "timeout": 60, // Timeout in seconds for each chunk or a photo
        "summary_interval": 30 // Interval in seconds to log progress summary
      }
    }

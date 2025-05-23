@@ -5,7 +5,7 @@ from time import time
 from mimetypes import guess_extension
 from tabulate import tabulate
 
-from sqlalchemy import select
+from sqlalchemy import select, bindparam
 
 from tgsync.config import config
 from tgsync.logger import logger
@@ -26,9 +26,15 @@ class ProgressSummary:
             'last_report': 0,
         } for i in range(config['download']['concurrent'])]
 
+    def init_task(self, seq, name, total):
+        self.tasks[seq]['name'] = name
+        self.tasks[seq]['total'] = total
+        self.tasks[seq]['speed'] = 0
+        self.tasks[seq]['received'] = 0
+        self.tasks[seq]['last_report'] = time()
+
     def make_progress_callback(self, seq):
-        def progress_callback(received, total):
-            self.tasks[seq]['total'] = total
+        def progress_callback(received):
             self.tasks[seq]['speed'] = \
                 (received - self.tasks[seq]['received']) / (time() - self.tasks[seq]['last_report'])
             self.tasks[seq]['received'] = received
@@ -72,6 +78,24 @@ class ProgressSummary:
         logger.info('\n'+tabulate(task_table))
 
 
+async def download_with_timeout(client, msg, file, progress_callback, timeout):
+    received = 0
+
+    iter_download = client.iter_download(msg.media)
+    with open(file, 'wb') as f:
+        while True:
+            try:
+                chunk = await asyncio.wait_for(anext(iter_download), timeout)
+                f.write(chunk)
+                received += len(chunk)
+                progress_callback(received)
+            except StopAsyncIteration:
+                break
+            except asyncio.TimeoutError:
+                logger.error(f'Timeout occurred while downloading {msg.chat_id}/{msg.id}.')
+                break
+
+
 async def save_worker(seq, queue, progress_summary, client):
     logger.debug(f'Worker {seq} started')
     progress_callback = progress_summary.make_progress_callback(seq)
@@ -80,37 +104,49 @@ async def save_worker(seq, queue, progress_summary, client):
         try:
             logger.debug(f'Worker {seq} fetching next message, queue size: {queue.qsize()}')
             msg = await queue.get()
+            logger.info(f'Worker {seq} starting download {msg.chat_id}/{msg.id}')
 
             if msg.photo:
-                entity_type = PhotoEntity
-                entity_id = msg.photo.id
                 tempfile = config['download']['incomplete'] / 'photos-by-id' / f'{msg.photo.id}.jpg'
                 file = config['download']['media'] / 'photos-by-id' / f'{msg.photo.id}.jpg'
                 progress_summary.tasks[seq]['name'] = f"{msg.chat_id}/{msg.id}.jpg"
+
+                await asyncio.wait_for(
+                    client.download_media(message=msg, file=tempfile),
+                    timeout=config['download']['timeout']
+                )
+
+                shutil.move(tempfile, file)
+
+                with session_generator() as session:
+                    entity = session.get(PhotoEntity, msg.photo.id)
+                    entity.saved = True
+
             elif msg.document:
-                entity_type = DocumentEntity
-                entity_id = msg.document.id
                 ext = guess_extension(msg.document.mime_type)
                 if ext is None:
                     ext = '.bin'
                 tempfile = config['download']['incomplete'] / 'documents-by-id' / f'{msg.document.id}{ext}'
                 file = config['download']['media'] / 'documents-by-id' / f'{msg.document.id}{ext}'
                 progress_summary.tasks[seq]['name'] = f'{msg.chat_id}/{msg.document.id}{ext}'
+                name = f'{msg.chat_id}/{msg.document.id}{ext}'
                 if msg.file.name:
-                    progress_summary.tasks[seq]['name'] = f'{msg.chat_id}/{msg.file.name}'
+                    name = f'{msg.chat_id}/{msg.file.name}'
+
+                progress_summary.init_task(seq, name, msg.document.size)
+
+                await download_with_timeout(client, msg, tempfile,
+                                            progress_callback,
+                                            config['download']['timeout'])
+
+                shutil.move(tempfile, file)
+
+                with session_generator() as session:
+                    entity = session.get(DocumentEntity, msg.document.id)
+                    entity.saved = True
+
             else:
                 raise ValueError('Message does not contain a photo or document')
-
-            logger.info(f'Worker {seq} start downloading {progress_summary.tasks[seq]["name"]}')
-            await client.download_media(message=msg,
-                                        file=tempfile,
-                                        progress_callback=None if msg.photo else progress_callback)
-
-            shutil.move(tempfile, file)
-
-            with session_generator() as session:
-                entity = session.get(entity_type, entity_id)
-                entity.saved = True
 
             logger.info(f'Worker {seq} download finished {progress_summary.tasks[seq]["name"]}')
 
@@ -135,38 +171,43 @@ async def save_all(client, chat_id, photo):
                for i in range(config['download']['concurrent'])]
 
     if photo:
-        stmt = (
-            select(
-                MessageEntity.id.label('message_id'),
-                PhotoEntity.id,
-            )
-            .join(PhotoEntity, MessageEntity.photo_id == PhotoEntity.id)
-            .where(
-                MessageEntity.chat_id == chat_id,
-                PhotoEntity.saved == False
-            )
-            .distinct(PhotoEntity.id)
-            .limit(config['tg']['message_limit'])
-        )
+        logger.info(f'Downloading photos from {chat_id}')
+        target_id = MessageEntity.photo_id
+        target_entity = PhotoEntity
+        target_col = PhotoEntity.id
+        saved_col = PhotoEntity.saved
     else:
-        stmt = (
-            select(
-                MessageEntity.id.label('message_id'),
-                DocumentEntity.id,
-            )
-            .join(DocumentEntity, MessageEntity.document_id == DocumentEntity.id)
-            .where(
-                MessageEntity.chat_id == chat_id,
-                DocumentEntity.saved == False
-            )
-            .distinct(DocumentEntity.id)
-            .limit(config['tg']['message_limit'])
+        logger.info(f'Downloading documents from {chat_id}')
+        target_id = MessageEntity.document_id
+        target_entity = DocumentEntity
+        target_col = DocumentEntity.id
+        saved_col = DocumentEntity.saved
+
+    subq = (
+        select(
+            MessageEntity.id,
+            target_id.label('media_id')
         )
+        .join(target_entity, target_id == target_col)
+        .where(
+            MessageEntity.chat_id == chat_id,
+            MessageEntity.id > bindparam('min_id'),
+            saved_col == False
+        )
+        .distinct(target_id)
+        .subquery()
+    )
+    stmt = (
+        select(subq.c.id, subq.c.media_id)
+        .order_by(subq.c.id)
+        .limit(config['tg']['message_limit'])
+    )
 
     try:
+        min_id = 0
         while True:
             with session_generator() as session:
-                msg_ids = session.execute(stmt).scalars().all()
+                msg_ids = session.execute(stmt, {'min_id': min_id}).scalars().all()
 
             if not msg_ids:
                 logger.info(f'All {"Photos" if photo else "Documents"} saved for {chat_id}')
@@ -181,7 +222,9 @@ async def save_all(client, chat_id, photo):
             for msg in msgs:
                 await queue.put(msg)
 
-            await queue.join()
+            min_id = msg_ids[-1]
+
+        await queue.join()
 
     except Exception:
         logger.error(traceback.format_exc())
